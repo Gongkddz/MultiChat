@@ -2,7 +2,7 @@
 const { JSDOM, VirtualConsole } = require('./frontend/node_modules/jsdom');
 (async () => {
     for (let attempt = 0; attempt < 50; attempt++) {
-        try { const response = await fetch('http://127.0.0.1:18765/'); if (response.ok) break; }
+        try { const response = await fetch('http://127.0.0.1:18765/'); await response.arrayBuffer(); if (response.ok) break; }
         catch (_) { if (attempt === 49) throw new Error('Preview server did not start'); }
         await new Promise(resolve => setTimeout(resolve, 100));
     }

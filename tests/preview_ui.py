@@ -112,6 +112,8 @@ window.addEventListener('load', async () => {
 </script>"""
 
 class Handler(SimpleHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
