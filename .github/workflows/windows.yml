@@ -1,0 +1,40 @@
+name: Windows build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.lock
+      - name: Backend tests
+        run: python scripts/run_tests.py
+      - name: Frontend tests
+        shell: pwsh
+        run: |
+          npm ci --prefix tests/frontend
+          $preview = Start-Process python -ArgumentList 'tests/preview_ui.py' -WindowStyle Hidden -PassThru
+          try { node tests/run_frontend.cjs; if ($LASTEXITCODE) { exit $LASTEXITCODE } }
+          finally { Stop-Process -Id $preview.Id -ErrorAction SilentlyContinue }
+      - name: Build portable release
+        run: |
+          python scripts/build_icon.py
+          python -m PyInstaller --noconfirm NVIDIAChat.spec
+          python scripts/package_release.py --version 1.0.0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MultiChat-windows-x64
+          path: release/*

@@ -1,0 +1,16 @@
+name: Bug report / 问题反馈
+description: Report a reproducible problem without private data.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: App and Windows version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, observed result and expected result
+      description: Do not include API keys or private conversations.
+    validations:
+      required: true

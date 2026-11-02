@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多供应商模型对话</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/workspace.css">
+    <link rel="icon" href="/static/brand/logo.svg" type="image/svg+xml">
+    <script src="/static/vendor/marked-15.0.12.min.js"></script>
+    <script src="/static/vendor/purify.min.js"></script>
+    <link rel="stylesheet" href="/static/vendor/github-dark-11.9.0.min.css">
+    <script src="/static/vendor/highlight-11.9.0.min.js"></script>
+</head>
+<body>
+    <!-- ===== Login Screen (overlay) ===== -->
+    <div id="login-screen" class="screen">
+        <div class="login-card">
+            <div class="login-logo">
+                <img src="/static/brand/logo.svg" width="56" height="56" alt="模型对话 Logo">
+                <h1>模型对话</h1>
+                <p id="login-provider-description">连接到 NVIDIA NIM 云端模型</p>
+            </div>
+            <div class="login-form">
+                <label for="login-provider-select">API 供应商</label>
+                <select id="login-provider-select">
+                    <option value="nvidia">NVIDIA NIM</option>
+                    <option value="deepseek">DeepSeek 官方 API</option>
+                </select>
+                <label for="api-key-input">API Key</label>
+                <div class="input-row">
+                    <input type="password" id="api-key-input" placeholder="输入 NVIDIA API Key (nvapi-...)" autocomplete="off">
+                    <button id="toggle-visibility" class="icon-btn" title="显示/隐藏">👁</button>
+                </div>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="save-key-checkbox" checked>
+                    <span>保存API Key，下次自动登录</span>
+                </label>
+                <button id="login-btn" class="primary-btn">登 录</button>
+                <div id="login-error" class="error-msg hidden"></div>
+                <div id="login-status" class="status-msg hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== App Layout ===== -->
+    <div id="app-layout" class="app-layout hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <img src="/static/brand/logo.svg" width="30" height="30" alt="">
+                <span class="sidebar-title">模型对话</span>
+                <button id="toggle-sidebar-btn" class="icon-btn" title="折叠侧栏">◀</button>
+            </div>
+
+            <div class="sidebar-navigation">
+                <button id="new-chat-btn" class="nav-button"><i data-icon="compose"></i>新聊天<span class="shortcut">Ctrl N</span></button>
+                <button id="new-project-btn" class="nav-button"><i data-icon="folder-plus"></i>新建项目</button>
+            </div>
+            <div class="sidebar-search">
+                <input type="text" id="search-input" placeholder="搜索聊天" autocomplete="off">
+            </div>
+
+            <div class="sidebar-section-label">项目与聊天</div>
+            <div class="sidebar-content" id="sidebar-content">
+                <!-- Workspaces & conversations rendered by JS -->
+            </div>
+
+            <div class="sidebar-footer">
+                <button id="api-keys-btn" class="nav-button"><i data-icon="key"></i>API 密钥<span class="nav-dot"></span></button>
+                <button id="settings-btn" class="nav-button"><i data-icon="settings"></i>设置</button>
+                <button id="sidebar-logout-btn" class="nav-button"><i data-icon="logout"></i>退出登录</button>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <div id="chat-screen" class="chat-screen">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button id="mobile-menu-btn" class="icon-btn mobile-menu-btn" title="打开侧栏">☰</button>
+                    <span class="conversation-title" id="conversation-title">新对话</span>
+                </div>
+                <div class="top-bar-right"><span class="workspace-badge">本地工作空间</span><button id="header-new-chat" class="icon-btn" title="新聊天"><i data-icon="compose"></i></button></div>
+            </header>
+
+            <div id="system-prompt-bar" class="system-prompt-bar collapsed">
+                <div class="system-prompt-header" id="system-prompt-toggle">
+                    <span>项目指令 <span class="subtle">· 在此项目的聊天中共享</span></span>
+                    <span class="toggle-arrow">▶</span>
+                </div>
+                <div class="system-prompt-body">
+                    <textarea id="system-prompt-input" rows="3" placeholder="输入系统提示词..."></textarea>
+                    <button id="save-system-prompt-btn" class="small-btn">保存</button>
+                </div>
+            </div>
+
+            <main id="chat-messages" class="chat-messages">
+                <div class="empty-chat">
+                    <div class="empty-chat-icon"><img src="/static/brand/logo.svg" alt="模型对话"></div>
+                    <h2>开始对话</h2>
+                    <p>选择供应商和模型，然后开始对话</p>
+                </div>
+            </main>
+
+            <footer class="input-area">
+                <div id="attached-files" class="attached-files hidden"></div>
+                <div id="edit-indicator" class="edit-indicator hidden">
+                    <span>✏️ 正在编辑消息</span>
+                    <button id="cancel-edit-btn" class="small-btn">取消编辑</button>
+                </div>
+                <div class="input-row-bottom">
+                    <div class="input-actions">
+                        <button id="attach-btn" class="icon-btn" title="上传文件/图片"><i data-icon="plus"></i></button>
+                        <input type="file" id="file-input" multiple accept="image/*,.txt,.md,.py,.js,.ts,.json,.xml,.csv,.pdf,.doc,.docx" hidden>
+                    </div>
+                    <div class="input-wrapper">
+                        <textarea id="user-input" rows="1" placeholder="输入消息，开始一个新想法…" disabled></textarea>
+                    </div>
+                    <div class="input-params">
+                        <div class="context-meter" id="usage-bar">
+                            <button id="context-ring" class="context-ring" aria-label="上下文余量；查看用量详情" aria-describedby="usage-tooltip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="ring-track" cx="12" cy="12" r="8.5"/><circle id="context-ring-value" cx="12" cy="12" r="8.5" pathLength="100"/></svg></button>
+                            <div id="usage-tooltip" class="usage-tooltip" role="tooltip"><strong>上下文与用量</strong><span id="context-percent">设置上下文容量后显示余量</span><span id="context-stat">剩余上下文 —</span><span id="cache-stat">缓存命中率 —</span><span id="total-stat">本对话累计 — tokens</span><small>上下文为估算值，用量以供应商返回为准。</small><button id="context-settings-btn" class="small-btn">设置模型容量</button></div>
+                        </div>
+                        <div class="composer-model">                    <select id="provider-select" class="provider-select" title="切换 API 供应商">
+                        <option value="nvidia">NVIDIA</option>
+                        <option value="deepseek">DeepSeek</option>
+                    </select>
+                    <div class="model-selector">
+                        <div class="searchable-select" id="model-select-wrapper">
+                            <input type="text" id="model-search-input" placeholder="搜索模型..." autocomplete="off" role="combobox" aria-controls="model-dropdown" aria-expanded="false" aria-autocomplete="list">
+                            <input type="hidden" id="model-select" value="">
+                            <div class="select-dropdown hidden" id="model-dropdown" role="listbox" aria-label="可用模型"></div>
+                        </div>
+                        <button id="refresh-models-btn" class="icon-btn" title="刷新模型列表"><i data-icon="refresh"></i></button>
+                    </div>
+</div>
+                        <button id="stop-btn" class="stop-btn hidden" title="停止生成">⏹ 停止</button>
+                        <button id="send-btn" class="primary-btn" title="发送消息" aria-label="发送消息" disabled><i data-icon="arrow-up"></i></button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ===== Settings Modal ===== -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header"><h2>设置</h2><button class="modal-close icon-btn">✖</button></div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>模型参数</label>
+                    <div class="setting-row"><span>Temperature</span><input type="range" id="temperature-slider" min="0" max="2" step="0.1" value="1"><span id="temperature-value">1.0</span></div>
+                    <div class="setting-row"><span>Max Tokens</span><input type="number" id="modal-max-tokens" min="1" max="131072" value="16384"></div>
+                    <div class="setting-row"><span>Seed</span><input type="number" id="modal-seed" min="0" max="2147483647" value="42"></div>
+                    <div class="setting-row"><span>当前模型上下文容量</span><input type="number" id="modal-context-window" min="1" step="1" placeholder="按供应商填写"></div>
+                    <p class="setting-help">按供应商和模型保存容量。剩余上下文为文本估算；图片无法估算。累计用量包含本次更新后返回 usage 的请求及重新生成。</p>
+                </div>
+                <div class="setting-group">
+                    <label>API Key</label>
+                    <div class="setting-row"><span id="current-provider-display">当前供应商</span><span id="current-key-display">未设置</span></div>
+                </div>
+                <div class="setting-group">
+                    <label>聊天记录迁移</label>
+                    <div class="setting-row data-transfer-row">
+                        <button id="export-data-btn" class="small-btn">导出聊天记录</button>
+                        <button id="import-data-btn" class="small-btn">导入聊天记录</button>
+                        <input id="import-data-input" type="file" accept="application/json,.json" hidden>
+                    </div>
+                    <p class="setting-help">导出文件不包含 API Key。导入时会合并记录，按记录时间合并已有对话。</p>
+                </div>
+            </div>
+            <div class="modal-footer"><button id="save-settings-btn" class="primary-btn">保存设置</button></div>
+        </div>
+    </div>
+
+    <div id="keys-modal" class="modal hidden">
+        <div class="modal-backdrop"></div><div class="modal-content">
+            <div class="modal-header"><h2>API 密钥</h2><button class="modal-close icon-btn" aria-label="关闭">×</button></div>
+            <div class="modal-body key-form">
+                <p class="setting-help">管理模型服务连接，保存后即可在输入框中选择模型。</p>
+                <label for="key-provider">供应商</label><select id="key-provider"><option value="nvidia">NVIDIA NIM</option><option value="deepseek">DeepSeek 官方 API</option></select>
+                <div id="key-connection" class="key-connection"></div>
+                <label for="managed-key">新增或更换 API Key</label><input id="managed-key" type="password" autocomplete="off" placeholder="粘贴新的 API Key">
+                <label class="checkbox-label"><input id="managed-key-visible" type="checkbox">显示输入的密钥</label>
+                <p class="setting-help">密钥保存在这台电脑的应用配置中，不随聊天记录导出。</p>
+                <div id="key-error" class="error-msg hidden" role="alert"></div>
+            </div><div class="modal-footer"><button id="remove-key-btn" class="small-btn danger-btn">移除密钥</button><button id="save-key-btn" class="primary-btn">验证并保存</button></div>
+        </div>
+    </div>
+    <!-- ===== Confirm Dialog ===== -->
+    <div id="confirm-dialog" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-sm">
+            <div class="modal-header"><h3 id="confirm-title">确认</h3></div>
+            <div class="modal-body"><p id="confirm-message"></p></div>
+            <div class="modal-footer">
+                <button id="confirm-cancel-btn" class="small-btn">取消</button>
+                <button id="confirm-ok-btn" class="primary-btn danger-btn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Rename Dialog ===== -->
+    <div id="rename-dialog" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-sm">
+            <div class="modal-header"><h3 id="rename-title">重命名</h3></div>
+            <div class="modal-body"><input type="text" id="rename-input" class="rename-input" placeholder="输入新名称..."></div>
+            <div class="modal-footer">
+                <button id="rename-cancel-btn" class="small-btn">取消</button>
+                <button id="rename-ok-btn" class="primary-btn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
