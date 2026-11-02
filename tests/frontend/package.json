@@ -1,1 +1,1 @@
-{"name":"multichat-frontend-tests","private":true,"version":"1.0.0","devDependencies":{"jsdom":"29.1.0"}}
+{"name":"multichat-frontend-tests","private":true,"version":"1.0.0","devDependencies":{"jsdom":"26.1.0"}}
